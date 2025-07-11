@@ -23,38 +23,32 @@ fetch_news_articles:
 analyze_news_sentiment:
   description: >
     Analyze the news articles collected about {driver_name} to extract key insights, sentiment trends,
-    and significant developments. Examine the overall narrative around the driver across different sources.
+    and significant developments. Select the 5 most relevant and recent articles from the fetched news.
+    For each selected article, create a concise news summary and provide an overall analysis.
     
     Key analysis areas:
+    - Select exactly 5 most relevant articles from the fetched news
+    - Create concise news summaries for each selected article
     - Overall sentiment (positive, neutral, negative) across articles
     - Major themes and storylines emerging in coverage
-    - Differences in coverage between sources
-    - Key quotes and significant developments
-    - Performance-related news vs. personal/off-track coverage
-    - Recent trends in media coverage
+    - Key developments and significant news about the driver
+    - Overall media narrative and public perception
     
-    Provide actionable insights that would be valuable for understanding the driver's current media presence.
+    Return the results in a structured JSON format with exactly 5 articles and a comprehensive summary.
   expected_output: >
-    A comprehensive news analysis report containing:
+    A structured JSON response containing exactly:
     
-    ## Overall Media Sentiment
-    Summary of how {driver_name} is being portrayed across major F1 sources.
+    1. "articles": An array of exactly 5 news articles, each containing:
+       - "title": The original article title
+       - "news": A concise 2-3 sentence summary of the article content
+       - "source": The news source (ESPN F1, Fox Sports, BBC Sport, Sky Sports F1, or Autosport)
+       - "published_at": Publication date as a string
     
-    ## Key Storylines
-    Main themes and narratives appearing in recent coverage.
+    2. "total_summary": A comprehensive paragraph (3-5 sentences) summarizing:
+       - Overall sentiment and narrative about {driver_name}
+       - Key themes emerging from the coverage
+       - Most significant developments or storylines
+       - Current media perception and any notable trends
     
-    ## Source Comparison
-    How different outlets (ESPN, Fox Sports, BBC, Sky Sports, Autosport) are covering the driver.
-    
-    ## Significant Quotes & Developments
-    Important statements, announcements, or developments mentioned in articles.
-    
-    ## Recent Performance Coverage
-    Analysis of race-related vs. off-track coverage balance.
-    
-    ## Media Trends
-    Notable patterns in recent coverage and potential implications.
-    
-    ## Summary
-    Overall assessment of {driver_name}'s current media presence and public narrative.
+    Ensure the output is valid JSON that exactly matches this structure.
   agent: news_analyzer_agent

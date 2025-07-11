@@ -11,13 +11,14 @@ from supabase import create_client, Client
 from postgrest import APIResponse
 from dotenv import load_dotenv
 from datetime import datetime
+from pathlib import Path
 
-load_dotenv()
+load_dotenv(dotenv_path=Path(".env.dev"))
 
 # Supabase client
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_DEV_URL = os.getenv("SUPABASE_DEV_URL")
+SUPABASE_DEV_KEY = os.getenv("SUPABASE_DEV_KEY")
+supabase: Client = create_client(SUPABASE_DEV_URL, SUPABASE_DEV_KEY)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

@@ -29,7 +29,7 @@ from crewai.project import CrewBase, agent, crew, task
 from crewai.tools import BaseTool
 
 # Local imports
-from driver_news_research_agent.schemas.news_fetch import NewsFetchOutput
+from schemas.news_fetch import NewsFetchOutput, F1NewsAnalysisOutput
 
 
 def setup_environment():
@@ -43,7 +43,7 @@ def setup_environment():
     os.makedirs("outputs", exist_ok=True)
     
     # Load environment variables
-    load_dotenv()
+    load_dotenv(dotenv_path=Path(".env.dev"))
     serper_api_key = os.getenv("SERPER_API_KEY")
     
     if not serper_api_key:
@@ -180,6 +180,7 @@ class F1NewsCrew():
             config=self.tasks_config['analyze_news_sentiment'],
             agent=self.news_analyzer_agent(),
             context=[self.fetch_news_articles()],
+            output_pydantic=F1NewsAnalysisOutput,
             output_file='outputs/f1_news_analysis.json'
         )
 
@@ -240,12 +241,17 @@ def run_f1_news_analysis(driver_name: str = "Max Verstappen"):
             print("✅ Results generated successfully!")
             print(f"📄 Check outputs/f1_news_analysis.json for detailed analysis")
             
-            # Display basic info if result has articles
+            # Display final analysis info
             if hasattr(result, 'articles') and result.articles:
-                print(f"\n📰 Found {len(result.articles)} articles")
-                for i, article in enumerate(result.articles[:3], 1):  # Show first 3
+                print(f"\n📰 Final Analysis: {len(result.articles)} articles")
+                for i, article in enumerate(result.articles, 1):
                     print(f"\n{i}. {article.title[:80]}...")
                     print(f"   Source: {article.source}")
+                    print(f"   Summary: {article.news[:100]}...")
+                
+                if hasattr(result, 'total_summary'):
+                    print(f"\n📊 Total Summary:")
+                    print(f"   {result.total_summary[:150]}...")
             else:
                 print("\n📋 Result:")
                 print(str(result)[:200] + "..." if len(str(result)) > 200 else str(result))
