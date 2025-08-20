@@ -47,6 +47,8 @@ async def startup_event():
     logger.info("🚀 FastAPI application starting up!")
     logger.info(f"Supabase URL configured: {'Yes' if SUPABASE_DEV_URL else 'No'}")
     logger.info(f"Supabase Key configured: {'Yes' if SUPABASE_DEV_KEY else 'No'}")
+    logger.info(f"PORT environment variable: {os.getenv('PORT')}")
+    logger.info(f"Starting server on port: {os.getenv('PORT', '8000')}")
 
 # Add CORS middleware
 app.add_middleware(
