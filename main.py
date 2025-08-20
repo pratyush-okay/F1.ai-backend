@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 from datetime import datetime
 from pathlib import Path
 
+# Set up logging first
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Load environment variables - update for production
 load_dotenv(dotenv_path=Path(".env.dev"))
 
@@ -33,10 +37,6 @@ try:
 except Exception as e:
     logger.error(f"Failed to create Supabase client: {e}")
     # Continue anyway so the app starts and we can debug
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 
 app = FastAPI(title="Formula1.ai API", description="F1 data API using OpenF1")
