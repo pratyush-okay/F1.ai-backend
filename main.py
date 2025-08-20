@@ -41,6 +41,13 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Formula1.ai API", description="F1 data API using OpenF1")
 
+# Add startup event to log when the app starts
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 FastAPI application starting up!")
+    logger.info(f"Supabase URL configured: {'Yes' if SUPABASE_DEV_URL else 'No'}")
+    logger.info(f"Supabase Key configured: {'Yes' if SUPABASE_DEV_KEY else 'No'}")
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
