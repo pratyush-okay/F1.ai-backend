@@ -16,8 +16,8 @@ from pathlib import Path
 load_dotenv(dotenv_path=Path(".env.dev"))
 
 # Supabase client
-SUPABASE_DEV_URL = os.getenv("SUPABASE_DEV_URL")
-SUPABASE_DEV_KEY = os.getenv("SUPABASE_DEV_KEY")
+SUPABASE_DEV_URL = os.getenv("SUPABASE_DEV_URL") or os.getenv("SUPABASE_URL")
+SUPABASE_DEV_KEY = os.getenv("SUPABASE_DEV_KEY") or os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_DEV_URL, SUPABASE_DEV_KEY)
 
 # Set up logging
@@ -30,7 +30,11 @@ app = FastAPI(title="Formula1.ai API", description="F1 data API using OpenF1")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js dev server
+    allow_origins=[
+        "http://localhost:3000",  # Next.js dev server
+        "https://your-frontend-domain.com",  # Add your production frontend URL
+        # Add Railway frontend URL when you know it
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
