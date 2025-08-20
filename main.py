@@ -13,12 +13,26 @@ from dotenv import load_dotenv
 from datetime import datetime
 from pathlib import Path
 
+# Load environment variables - update for production
 load_dotenv(dotenv_path=Path(".env.dev"))
 
-# Supabase client
+# For production, also try to load from environment directly
 SUPABASE_DEV_URL = os.getenv("SUPABASE_DEV_URL") or os.getenv("SUPABASE_URL")
 SUPABASE_DEV_KEY = os.getenv("SUPABASE_DEV_KEY") or os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_DEV_URL, SUPABASE_DEV_KEY)
+
+# Add validation for required environment variables
+if not SUPABASE_DEV_URL or not SUPABASE_DEV_KEY:
+    logger.error("Missing required environment variables: SUPABASE_DEV_URL and SUPABASE_DEV_KEY")
+    logger.error(f"SUPABASE_DEV_URL: {SUPABASE_DEV_URL}")
+    logger.error(f"SUPABASE_DEV_KEY: {'***' if SUPABASE_DEV_KEY else 'None'}")
+    # Don't exit, but log the error so we can see it in Railway logs
+
+try:
+    supabase: Client = create_client(SUPABASE_DEV_URL, SUPABASE_DEV_KEY)
+    logger.info("Supabase client created successfully")
+except Exception as e:
+    logger.error(f"Failed to create Supabase client: {e}")
+    # Continue anyway so the app starts and we can debug
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
