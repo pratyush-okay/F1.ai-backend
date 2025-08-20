@@ -119,6 +119,21 @@ def find_driver_standing(driver_name: str, name_acronym: str, standings_data: Di
 def read_root():
     return {"message": "Formula1.ai API - Ready to serve F1 data!"}
 
+# Add a simple health check endpoint
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+# Add this simple endpoint that doesn't use database
+@app.get("/test")
+def test_endpoint():
+    return {
+        "status": "ok", 
+        "message": "Test endpoint working",
+        "timestamp": datetime.utcnow().isoformat(),
+        "supabase_url_set": bool(SUPABASE_DEV_URL),
+        "supabase_key_set": bool(SUPABASE_DEV_KEY)
+    }
 @app.get("/api/driver-standings")
 async def get_driver_standings():
     """Fetch current driver championship standings from Supabase database (frontend compatibility)"""
@@ -719,3 +734,13 @@ async def get_teams_standings():
     except Exception as e:
         logger.error(f"Error fetching team standings: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching team standings: {str(e)}")
+
+@app.get("/test")
+def test_endpoint():
+    return {
+        "status": "ok", 
+        "message": "Test endpoint working",
+        "timestamp": datetime.utcnow().isoformat(),
+        "supabase_url_set": bool(SUPABASE_DEV_URL),
+        "supabase_key_set": bool(SUPABASE_DEV_KEY)
+    }
