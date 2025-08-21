@@ -3,3 +3,4 @@ uvicorn[standard]==0.24.0
 httpx>=0.24.0,<0.25.0
 supabase==2.0.2
 python-dotenv==1.0.0
+hypercorn==0.14.4
