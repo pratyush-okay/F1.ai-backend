@@ -41,6 +41,24 @@ except Exception as e:
 
 app = FastAPI(title="Formula1.ai API", description="F1 data API using OpenF1")
 
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+# CORS configuration
+origins = [
+    frontend_url,
+    "http://localhost:3000",  # for local development
+    "http://localhost:3001",  # additional local ports if needed
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # Add startup event to log when the app starts
 @app.on_event("startup")
 async def startup_event():
@@ -49,18 +67,6 @@ async def startup_event():
     logger.info(f"Supabase Key configured: {'Yes' if SUPABASE_DEV_KEY else 'No'}")
     logger.info(f"PORT environment variable: {os.getenv('PORT')}")
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # Next.js dev server
-        "https://your-frontend-domain.com",  # Add your production frontend URL
-        # Add Railway frontend URL when you know it
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Driver numbers mapping based on 2025 season data
 DRIVER_NUMBERS = [1, 4, 5, 6, 10, 12, 14, 16, 18, 22, 23, 27, 30, 31, 43, 44, 55, 63, 81, 87]
@@ -735,13 +741,3 @@ async def get_teams_standings():
     except Exception as e:
         logger.error(f"Error fetching team standings: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching team standings: {str(e)}")
-
-@app.get("/test")
-def test_endpoint():
-    return {
-        "status": "ok", 
-        "message": "Test endpoint working",
-        "timestamp": datetime.utcnow().isoformat(),
-        "supabase_url_set": bool(SUPABASE_DEV_URL),
-        "supabase_key_set": bool(SUPABASE_DEV_KEY)
-    }
