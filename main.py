@@ -461,7 +461,7 @@ def upsert_f1api_driver_standings(standings: List[Dict[str, Any]], season: int, 
         .upsert(
             rows,
             on_conflict="classification_id",
-            ignore_duplicates=True,
+            ignore_duplicates=False,
             returning="representation",  # to get back the rows we wrote
         )
         .execute()
@@ -496,7 +496,7 @@ def upsert_f1api_team_standings(standings: List[Dict[str, Any]], season: int, ch
         .upsert(
             rows,
             on_conflict="classification_id",
-            ignore_duplicates=True,
+            ignore_duplicates=False,
             returning="representation",  # to get back the rows we wrote
         )
         .execute()
