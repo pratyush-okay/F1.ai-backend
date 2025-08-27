@@ -49,6 +49,9 @@ origins = [
     frontend_url,
     "http://localhost:3000",  # for local development
     "http://localhost:3001",  # additional local ports if needed
+    "https://f1ai-frontend-production.up.railway.app/",  # Railway default domain
+    "https://www.formula1.ai",  # Your custom domain
+    "https://formula1.ai",
 ]
 
 app.add_middleware(
