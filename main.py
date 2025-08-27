@@ -975,61 +975,6 @@ async def get_f1_ai_news_files_by_date(date_folder: str):
         logger.error(f"Error fetching files for date {date_folder}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching files for date {date_folder}: {str(e)}")
 
-@app.get("/api/storage/f1-ai-news/latest-summaries")
-async def get_latest_driver_summaries():
-    """
-    Fetch total summaries for all drivers from the most recent date folder.
-    
-    Returns:
-        Dictionary containing total summaries for all drivers from the latest date
-    """
-    try:
-        bucket_name = "f1_ai_news"
-        
-        # First, list the root directory to get date folders
-        root_response = supabase.storage.from_(bucket_name).list()
-        
-        if not root_response:
-            logger.warning(f"No folders found in bucket {bucket_name}")
-            return {
-                "message": "No date folders found in storage",
-                "bucket": bucket_name,
-                "latest_date": None,
-                "total_drivers": 0,
-                "summaries": {},
-                "errors": []
-            }
-        
-        # Find the most recent date folder
-        date_folders = []
-        for folder_info in root_response:
-            folder_name = folder_info.get('name', '')
-            if folder_name and re.match(r'^\d{4}-\d{2}-\d{2}$', folder_name):
-                date_folders.append(folder_name)
-        
-        if not date_folders:
-            logger.warning(f"No valid date folders found in bucket {bucket_name}")
-            return {
-                "message": "No valid date folders found in storage",
-                "bucket": bucket_name,
-                "latest_date": None,
-                "total_drivers": 0,
-                "summaries": {},
-                "errors": []
-            }
-        
-        # Sort date folders and get the latest one
-        date_folders.sort(reverse=True)
-        latest_date = date_folders[0]
-        
-        logger.info(f"Latest date folder found: {latest_date}")
-        
-        # Use the existing endpoint to get summaries for the latest date
-        return await get_all_driver_summaries_by_date(latest_date)
-        
-    except Exception as e:
-        logger.error(f"Error fetching latest driver summaries: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching latest driver summaries: {str(e)}")
 
 @app.get("/api/storage/f1-ai-news/{date_folder}/summaries")
 async def get_all_driver_summaries_by_date(date_folder: str):
@@ -1122,6 +1067,109 @@ async def get_all_driver_summaries_by_date(date_folder: str):
     except Exception as e:
         logger.error(f"Error fetching driver summaries for date {date_folder}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching driver summaries: {str(e)}")
+
+@app.get("/api/storage/f1-ai-team-news/{date_folder}/summaries")
+async def get_all_team_summaries_by_date(date_folder: str):
+    """
+    Fetch total summaries for all teams from a specific date folder.
+    
+    Args:
+        date_folder: Date folder to fetch from (format: YYYY-MM-DD)
+    
+    Returns:
+        Dictionary containing total summaries for all teams from that date
+    """
+    try:
+        # Validate date format
+        try:
+            datetime.strptime(date_folder, '%Y-%m-%d')
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        
+        bucket_name = "f1_ai_team_news"
+        
+        # List files in the specific date folder
+        try:
+            folder_files = supabase.storage.from_(bucket_name).list(path=date_folder)
+        except Exception as folder_err:
+            logger.error(f"Error listing files in folder {date_folder}: {folder_err}")
+            raise HTTPException(status_code=404, detail=f"Date folder {date_folder} not found or error accessing it")
+        
+        if not folder_files:
+            logger.warning(f"No files found in date folder {date_folder}")
+            return {
+                "message": f"No files found in date folder {date_folder}",
+                "date_folder": date_folder,
+                "total_teams": 0,
+                "summaries": {},
+                "errors": []
+            }
+        
+        summaries = {}
+        errors = []
+        total_teams = 0
+        
+        # Process each JSON file in the date folder
+        for file_info in folder_files:
+            filename = file_info.get('name', '')
+            
+            # Check if filename matches expected pattern (teamname.json)
+            if filename.endswith('.json'):
+                file_path = f"{date_folder}/{filename}"
+                team_name = filename.replace('.json', '')
+                
+                try:
+                    # Download and parse the JSON file
+                    file_content = supabase.storage.from_(bucket_name).download(file_path)
+                    json_data = json.loads(file_content.decode('utf-8'))
+                    
+                    # Extract total summary from the content field
+                    # Based on the JSON structure: content -> total_summary
+                    content = json_data.get('content', {})
+                    total_summary = content.get('total_summary', '')
+                    
+                    # Debug logging to see what we're getting
+                    logger.info(f"Processing {filename}: content keys = {list(content.keys()) if content else 'None'}")
+                    logger.info(f"Processing {filename}: total_summary = {total_summary[:100] if total_summary else 'None'}...")
+                    
+                    # If not found in content, try direct access (fallback)
+                    if not total_summary:
+                        total_summary = json_data.get('total_summary', '')
+                        logger.info(f"Trying direct access for {filename}: total_summary = {total_summary[:100] if total_summary else 'None'}...")
+                    
+                    if total_summary:
+                        summaries[f"{team_name}_total_summary"] = total_summary
+                        total_teams += 1
+                    else:
+                        errors.append(f"No total_summary found in {filename}")
+                        
+                except json.JSONDecodeError as json_err:
+                    error_msg = f"Invalid JSON in {filename}: {str(json_err)}"
+                    errors.append(error_msg)
+                    logger.warning(error_msg)
+                except Exception as file_err:
+                    error_msg = f"Error processing {filename}: {str(file_err)}"
+                    errors.append(error_msg)
+                    logger.warning(error_msg)
+        
+        # Sort summaries by team name for consistent ordering
+        sorted_summaries = dict(sorted(summaries.items()))
+        
+        logger.info(f"Retrieved summaries for {total_teams} teams from date folder {date_folder}")
+        
+        return {
+            "message": f"Retrieved summaries for {total_teams} teams from {date_folder}",
+            "date_folder": date_folder,
+            "total_teams": total_teams,
+            "summaries": sorted_summaries,
+            "errors": errors if errors else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching team summaries for date {date_folder}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching team summaries: {str(e)}")
 
 @app.get("/api/storage/f1-ai-news/{date_folder}/{filename}")
 async def get_f1_ai_news_file_content(date_folder: str, filename: str):
@@ -1176,71 +1224,18 @@ async def get_f1_ai_news_file_content(date_folder: str, filename: str):
     except Exception as e:
         logger.error(f"Error fetching file content for {date_folder}/{filename}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching file content: {str(e)}")
-async def get_latest_driver_summaries():
-    """
-    Fetch total summaries for all drivers from the most recent date folder.
-    
-    Returns:
-        Dictionary containing total summaries for all drivers from the latest date
-    """
-    try:
-        bucket_name = "f1_ai_news"
-        
-        # First, list the root directory to get date folders
-        root_response = supabase.storage.from_(bucket_name).list()
-        
-        if not root_response:
-            logger.warning(f"No folders found in bucket {bucket_name}")
-            return {
-                "message": "No date folders found in storage",
-                "bucket": bucket_name,
-                "latest_date": None,
-                "total_drivers": 0,
-                "summaries": {},
-                "errors": []
-            }
-        
-        # Find the most recent date folder
-        date_folders = []
-        for folder_info in root_response:
-            folder_name = folder_info.get('name', '')
-            if folder_name and re.match(r'^\d{4}-\d{2}-\d{2}$', folder_name):
-                date_folders.append(folder_name)
-        
-        if not date_folders:
-            logger.warning(f"No valid date folders found in bucket {bucket_name}")
-            return {
-                "message": "No valid date folders found in storage",
-                "bucket": bucket_name,
-                "latest_date": None,
-                "total_drivers": 0,
-                "summaries": {},
-                "errors": []
-            }
-        
-        # Sort date folders and get the latest one
-        date_folders.sort(reverse=True)
-        latest_date = date_folders[0]
-        
-        logger.info(f"Latest date folder found: {latest_date}")
-        
-        # Use the existing endpoint to get summaries for the latest date
-        return await get_all_driver_summaries_by_date(latest_date)
-        
-    except Exception as e:
-        logger.error(f"Error fetching latest driver summaries: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching latest driver summaries: {str(e)}")
 
-@app.get("/api/storage/f1-ai-news/{date_folder}/summaries")
-async def get_all_driver_summaries_by_date(date_folder: str):
+@app.get("/api/storage/f1-ai-team-news/{date_folder}/{filename}")
+async def get_f1_ai_team_news_file_content(date_folder: str, filename: str):
     """
-    Fetch total summaries for all drivers from a specific date folder.
+    Fetch the content of a specific file from the f1_ai_team_news storage bucket.
     
     Args:
-        date_folder: Date folder to fetch from (format: YYYY-MM-DD)
+        date_folder: Date folder (format: YYYY-MM-DD)
+        filename: Name of the file (e.g., teamname.json)
     
     Returns:
-        Dictionary containing total summaries for all drivers from that date
+        The file content as JSON
     """
     try:
         # Validate date format
@@ -1249,228 +1244,37 @@ async def get_all_driver_summaries_by_date(date_folder: str):
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
         
-        bucket_name = "f1_ai_news"
+        # Validate filename format
+        if not filename.endswith('.json'):
+            raise HTTPException(status_code=400, detail="Invalid filename format. Expected: teamname.json")
         
-        # List files in the specific date folder
+        bucket_name = "f1_ai_team_news"
+        file_path = f"{date_folder}/{filename}"
+        
         try:
-            folder_files = supabase.storage.from_(bucket_name).list(path=date_folder)
-        except Exception as folder_err:
-            logger.error(f"Error listing files in folder {date_folder}: {folder_err}")
-            raise HTTPException(status_code=404, detail=f"Date folder {date_folder} not found or error accessing it")
-        
-        if not folder_files:
-            logger.warning(f"No files found in date folder {date_folder}")
-            return {
-                "message": f"No files found in date folder {date_folder}",
-                "date_folder": date_folder,
-                "total_drivers": 0,
-                "summaries": {},
-                "errors": []
-            }
-        
-        summaries = {}
-        errors = []
-        total_drivers = 0
-        
-        # Process each JSON file in the date folder
-        for file_info in folder_files:
-            filename = file_info.get('name', '')
+            # Download the file content
+            file_content = supabase.storage.from_(bucket_name).download(file_path)
             
-            # Check if filename matches expected pattern (driverfirstname_lastname.json)
-            if filename.endswith('.json') and '_' in filename:
-                file_path = f"{date_folder}/{filename}"
-                driver_name = filename.replace('.json', '')
+            # Parse JSON content
+            try:
+                json_data = json.loads(file_content.decode('utf-8'))
+                return {
+                    "message": "Team news file content retrieved successfully",
+                    "date_folder": date_folder,
+                    "filename": filename,
+                    "team_name": filename.replace('.json', ''),
+                    "content": json_data,
+                    "file_size": len(file_content)
+                }
+            except json.JSONDecodeError as json_err:
+                raise HTTPException(status_code=500, detail=f"Invalid JSON content in file: {str(json_err)}")
                 
-                try:
-                    # Download and parse the JSON file
-                    file_content = supabase.storage.from_(bucket_name).download(file_path)
-                    json_data = json.loads(file_content.decode('utf-8'))
-                    
-                    # Extract total summary from the JSON
-                    total_summary = json_data.get('total_summary', '')
-                    
-                    if total_summary:
-                        summaries[f"{driver_name}_total_summary"] = total_summary
-                        total_drivers += 1
-                    else:
-                        errors.append(f"No total_summary found in {filename}")
-                        
-                except json.JSONDecodeError as json_err:
-                    error_msg = f"Invalid JSON in {filename}: {str(json_err)}"
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-                except Exception as file_err:
-                    error_msg = f"Error processing {filename}: {str(file_err)}"
-                    errors.append(error_msg)
-                    logger.warning(error_msg)
-        
-        # Sort summaries by driver name for consistent ordering
-        sorted_summaries = dict(sorted(summaries.items()))
-        
-        logger.info(f"Retrieved summaries for {total_drivers} drivers from date folder {date_folder}")
-        
-        return {
-            "message": f"Retrieved summaries for {total_drivers} drivers from {date_folder}",
-            "date_folder": date_folder,
-            "total_drivers": total_drivers,
-            "summaries": sorted_summaries,
-            "errors": errors if errors else None
-        }
+        except Exception as download_err:
+            logger.error(f"Error downloading team news file {file_path}: {download_err}")
+            raise HTTPException(status_code=404, detail=f"Team news file not found or error downloading: {str(download_err)}")
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching driver summaries for date {date_folder}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching driver summaries: {str(e)}")
-    """
-    Fetch total summaries for all drivers from the most recent date folder.
-    
-    Returns:
-        Dictionary containing total summaries for all drivers from the latest date
-    """
-    try:
-        bucket_name = "f1_ai_news"
-        
-        # First, list the root directory to get date folders
-        root_response = supabase.storage.from_(bucket_name).list()
-        
-        if not root_response:
-            logger.warning(f"No folders found in bucket {bucket_name}")
-            return {
-                "message": "No date folders found in storage",
-                "bucket": bucket_name,
-                "latest_date": None,
-                "total_drivers": 0,
-                "summaries": {},
-                "errors": []
-            }
-        
-        # Find the most recent date folder
-        date_folders = []
-        for folder_info in root_response:
-            folder_name = folder_info.get('name', '')
-            if folder_name and re.match(r'^\d{4}-\d{2}-\d{2}$', folder_name):
-                date_folders.append(folder_name)
-        
-        if not date_folders:
-            logger.warning(f"No valid date folders found in bucket {bucket_name}")
-            return {
-                "message": "No valid date folders found in storage",
-                "bucket": bucket_name,
-                "latest_date": None,
-                "total_drivers": 0,
-                "summaries": {},
-                "errors": []
-            }
-        
-        # Sort date folders and get the latest one
-        date_folders.sort(reverse=True)
-        latest_date = date_folders[0]
-        
-        logger.info(f"Latest date folder found: {latest_date}")
-        
-        # Use the existing endpoint to get summaries for the latest date
-        return await get_all_driver_summaries_by_date(latest_date)
-        
-    except Exception as e:
-        logger.error(f"Error fetching latest driver summaries: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching latest driver summaries: {str(e)}")
-
-@app.get("/api/storage/f1-ai-news/drivers/{driver_name}")
-async def get_driver_news_files(driver_name: str, date_filter: Optional[str] = None):
-    """
-    Fetch all news files for a specific driver across all date folders.
-    
-    Args:
-        driver_name: Driver name in format "firstname_lastname" or "firstname lastname"
-        date_filter (optional): Specific date folder to search in (format: YYYY-MM-DD)
-    
-    Returns:
-        Dictionary containing all news files for the specified driver
-    """
-    try:
-        # Normalize driver name to filename format
-        driver_filename = driver_name.replace(' ', '_') + '.json'
-        
-        bucket_name = "f1_ai_news"
-        
-        # First, list the root directory to get date folders
-        root_response = supabase.storage.from_(bucket_name).list()
-        
-        if not root_response:
-            logger.warning(f"No folders found in bucket {bucket_name}")
-            return {
-                "message": "No folders found in storage",
-                "driver_name": driver_name,
-                "driver_filename": driver_filename,
-                "files": [],
-                "total_files": 0
-            }
-        
-        driver_files = []
-        
-        # Process each folder in the root
-        for folder_info in root_response:
-            folder_name = folder_info.get('name', '')
-            
-            # Skip if it's not a folder or doesn't match date pattern
-            if not folder_name or not re.match(r'^\d{4}-\d{2}-\d{2}$', folder_name):
-                continue
-            
-            # Apply date filter if specified
-            if date_filter and folder_name != date_filter:
-                continue
-            
-            try:
-                # List files in this date folder
-                folder_files = supabase.storage.from_(bucket_name).list(path=folder_name)
-                
-                if folder_files:
-                    for file_info in folder_files:
-                        filename = file_info.get('name', '')
-                        
-                        # Check if this is the driver's file
-                        if filename == driver_filename:
-                            file_path = f"{folder_name}/{filename}"
-                            
-                            try:
-                                # Get public URL for the file
-                                file_url = supabase.storage.from_(bucket_name).get_public_url(file_path)
-                                
-                                file_data = {
-                                    "date_folder": folder_name,
-                                    "filename": filename,
-                                    "path": file_path,
-                                    "size": file_info.get('metadata', {}).get('size', 0),
-                                    "created_at": file_info.get('created_at'),
-                                    "updated_at": file_info.get('updated_at'),
-                                    "public_url": file_url
-                                }
-                                
-                                driver_files.append(file_data)
-                                
-                            except Exception as file_err:
-                                logger.warning(f"Error processing file {file_path}: {file_err}")
-                                continue
-                
-            except Exception as folder_err:
-                logger.warning(f"Error processing folder {folder_name}: {folder_err}")
-                continue
-        
-        # Sort files by date folder (newest first)
-        driver_files.sort(key=lambda x: x['date_folder'], reverse=True)
-        
-        logger.info(f"Retrieved {len(driver_files)} files for driver {driver_name}")
-        
-        return {
-            "message": f"Retrieved {len(driver_files)} files for driver {driver_name}",
-            "driver_name": driver_name,
-            "driver_filename": driver_filename,
-            "date_filter": date_filter,
-            "files": driver_files,
-            "total_files": len(driver_files)
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching driver files for {driver_name}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching driver files: {str(e)}")
+        logger.error(f"Error fetching team news file content for {date_folder}/{filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching team news file content: {str(e)}")
